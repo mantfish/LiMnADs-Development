@@ -1,210 +1,105 @@
-#include <SoftwareSerial.h>                           //we have to include the SoftwareSerial library, or else we can't use it
-#define temp_rx 2                                          //define what pin rx is going to be
-#define temp_tx 3                                          //define what pin tx is going to be
+// Include the SoftwareSerial library. It allows us to use serial communication.
+#include <SoftwareSerial.h>
 
+// Define temperature serial pins
+#define temp_rx 2
+#define temp_tx 3
+
+// Define pressure serial pins
 #define press_rx 4
 #define press_tx 5
 
+// Define ph serial pins
 #define ph_rx 6
 #define ph_tx 7
 
+// Define conductivity pins
 #define conduct_rx 8
 #define conduct_tx 9
 
-SoftwareSerial temp_serial(temp_rx, temp_tx);                      //define how the soft serial port is going to work
+// Set up all the sensor serial ports
+SoftwareSerial temp_serial(temp_rx, temp_tx);                      
 SoftwareSerial press_serial(press_rx, press_tx);
 SoftwareSerial ph_serial(ph_rx, ph_tx);
 SoftwareSerial conduct_serial(conduct_rx, conduct_tx);
 
-String inputstring = "";                              
-String sensorstring = "";                             
-boolean input_string_complete = false;                
-boolean sensor_string_complete = false; 
-float temperature;
+void setup() {           
+  // Begin all the serial port
 
-
-
-void setup() {                                        
-  Serial.begin(9600);                                 
-  myserial.begin(9600);                               
-  inputstring.reserve(10);                            
-  sensorstring.reserve(30);                           
+  Serial.begin(9600);  // This is the serial monitor / Raspberry Pi serial port                                 
+  temp_serial.begin(9600);
+  press_serial.begin(9600);
+  ph_serial.begin(9600);
+  conduct_serial.begin(9600);
 }
 
 
-void print_EC_data(void) {                            //this function will pars the string  
+float takeSensorReading(sensor_serial_port){
+  // Fuction to take sernsor readings with the Ph, temperature, conductivity and pressure
+  //  sensors
 
-  char sensorstring_array[30];                        //we make a char array
-  char *EC;                                           //char pointer used in string parsing
-  char *TDS;                                          //char pointer used in string parsing
-  char *SAL;                                          //char pointer used in string parsing
-  char *GRAV;                                         //char pointer used in string parsing
-  float f_ec;                                         //used to hold a floating point number that is the EC
-  
-  sensorstring.toCharArray(sensorstring_array, 30);   //convert the string to a char array 
-  EC = strtok(sensorstring_array, ",");               //let's pars the array at each comma
-  TDS = strtok(NULL, ",");                            //let's pars the array at each comma
-  SAL = strtok(NULL, ",");                            //let's pars the array at each comma
-  GRAV = strtok(NULL, ",");                           //let's pars the array at each comma
+  String sensor_string = "";                                          // Create an empty string to store the output of the sensor  
+  float reading;                                                      // Create a number which can store the value read by the sensor
+  bool sensor_string_complete = false;                                // Set the reading complete variable to false
+  unsigned long timer = millis();                                     // Start a timer
 
-  Serial.print("EC:");                                //we now print each value we parsed separately
-  Serial.println(EC);                                 //this is the EC value
+  // If there is still data coming in from the sensor, or if less then 10 seconds have passed, continue looping
+  while (sensor_serial_port.available() > 0 && sensor_string_complete == false) {  
+      char sensor_char = (char)sensor_serial_port.read();             // read a character from the serial port       
+      sensor_string += sensor_char;                                   // Add this character to the sensor string       
+      if (sensor_char == '\r') {                                      // if the character is newline, stop the loop                   
+          sensor_string_complete = true;                  
+      }
 
-  Serial.print("TDS:");                               //we now print each value we parsed separately
-  Serial.println(TDS);                                //this is the TDS value
+      if ( (millis() - timer) < 10000){                               // if more then 10 seconds have passed, return -1000 as the value.
+          return -1000;
+      }
 
-  Serial.print("SAL:");                               //we now print each value we parsed separately
-  Serial.println(SAL);                                //this is the salinity value
+  }
 
-  Serial.print("GRAV:");                              //we now print each value we parsed separately
-  Serial.println(GRAV);                               //this is the specific gravity
-  Serial.println();                                   //this just makes the output easier to read
-  
-//f_ec= atof(EC);                                     //uncomment this line to convert the char to a float
+  if (isdigit(sensor_string[0])) {                                    // If the first vaulue of the data received from the sensor is a digit contineu           
+      reading = sensor_string.toFloat();                              // make the sensor string a number
+  }
+  else {
+      reading = -1000;                                                 // If the data is NOT a digit return -1000
+  }
+
+  return reading;
 }
 
 
-
-float takeTemperature() {
-// Take temperature reading
-// Todo: Check don't need to send anything to temperature probe
-    char inchar;
-    bool sensor_string_complete = false;
-    unsigned long start = millis();
-
-    while (temp_serial.available() > 0 && sensor_string_complete == false) {
-        char inchar = (char)temp_serial.read();              
-        sensorstring += inchar;
-        if (inchar == '\r') {                             
-            sensor_string_complete = true;                  
-        }
-
-        if ( (millis() - start) < 10000){
-            return -1000;
-        }
-
-    }
-
-    if (isdigit(sensorstring[0])) {                  
-        temperature = sensorstring.toFloat();
-    }
-    else {
-        temperature = -1000;
-    }
-
-    return temperature;
-}
-
-float takePressure() {
-// Take pressure reading
-// Todo: Check don't need to send anything to temperature probe
-    char inchar;
-    bool press_sensor_string_complete = false;
-    unsigned long press_start = millis();
-
-    while (press_serial.available() > 0 && press_string_complete == false) {
-        char press_inchar = (char)press_serial.read();              
-        press_sensorstring += inchar;
-        if (inchar == '\r') {                             
-            press_sensor_string_complete = true;                  
-        }
-
-        if ( (millis() - start) < 10000){
-            return -1000;
-        }
-
-    }
-
-    if (isdigit(sensorstring[0])) {                  
-        temperature = sensorstring.toFloat();
-    }
-    else {
-        temperature = -1000;
-    }
-
-    return temperature;
-}
-
-float takePh() {
-// Take pressure reading
-// Todo: Check don't need to send anything to temperature probe
-    char inchar;
-    bool press_sensor_string_complete = false;
-    unsigned long press_start = millis();
-
-    while (press_serial.available() > 0 && press_string_complete == false) {
-        char press_inchar = (char)press_serial.read();              
-        press_sensorstring += inchar;
-        if (inchar == '\r') {                             
-            press_sensor_string_complete = true;                  
-        }
-
-        if ( (millis() - start) < 10000){
-            return -1000;
-        }
-
-    }
-
-    if (isdigit(sensorstring[0])) {                  
-        temperature = sensorstring.toFloat();
-    }
-    else {
-        temperature = -1000;
-    }
-
-    return temperature;
-}
-
-float takeConduct() {
-// Take pressure reading
-// Todo: Check don't need to send anything to temperature probe
-    char inchar;
-    bool press_sensor_string_complete = false;
-    unsigned long press_start = millis();
-
-    while (press_serial.available() > 0 && press_string_complete == false) {
-        char press_inchar = (char)press_serial.read();              
-        press_sensorstring += inchar;
-        if (inchar == '\r') {                             
-            press_sensor_string_complete = true;                  
-        }
-
-        if ( (millis() - start) < 10000){
-            return -1000;
-        }
-
-    }
-
-    if (isdigit(sensorstring[0])) {                  
-        temperature = sensorstring.toFloat();
-    }
-    else {
-        temperature = -1000;
-    }
-
-    return temperature;
-}
-
-
-
-void loop() {   
-  if (Serial.available()) {
-    String measurmenttype = Serial.readString();
-    switch(measurmenttype){
+void loop() { 
+  // Main loop of the program  
+  if (Serial.available()) {                                           // If there is data in the serial port from the serial monitor / Raspberry Pi                    
+    String measurmenttype = Serial.readString();                      // Read the string given by the serial monitor       
+    switch(measurmenttype){                                           // Take what ever measurment is required optinos are "temp", "press", "ph" and "conduct"
       case "temp":
-        float tempresult = takeTemperature();
-        Serial.print(tempresult);
+        float temp_result = takeSensorReading(temp_serial);
+        Serial.print(temp_result);
         Serial.println( " Degrees");
         break;
 
       case "press":
         //Todo: check pressure units
-        float presresult = takePressure();
-        Serial.print(presresult);
+        float pres_result = takeSensorReading(press_serial);
+        Serial.print(pres_result);
         Serial.println( " Bar?");
         break;
 
+      case "ph":
+        float ph_result = takeSensorReading(ph_serial);
+        Serial.print(ph_result);
+        Serial.println(" pH");
+        break;
+
+      case "conduct":
+        float conduct_result = takeSensorReading(conduct_serial);
+        Serial.print(conduct_result);
+        Serial.println(" micro s");
+        break;
+
       default:
+        // If the input to the serial port isn't temp, ph, condcut or press display not implemented yet
         Serial.println("Not implemented yet");
         break;
     }
